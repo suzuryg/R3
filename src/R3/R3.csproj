@@ -1,6 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <AssemblyName>Suzuryg.FaceEmo.Ext.R3</AssemblyName>
+
         <TargetFrameworks>netstandard2.0;netstandard2.1;net6.0;net8.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
