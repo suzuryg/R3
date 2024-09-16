@@ -1,0 +1,43 @@
+name: Update-R3-for-FaceEmo
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version number to checkout and merge (e.g., 1.0.0)"
+        required: true
+
+jobs:
+  update-r3-for-face-emo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git user
+        run: |
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+            fetch-depth: 0
+
+      - name: Fetch and merge R3 version
+        run: |
+          git remote add upstream https://github.com/Cysharp/R3.git
+          git fetch upstream --tags
+          git checkout -b ${{ inputs.tag }} $(git rev-list -n 1 tags/${{ inputs.tag }})
+          git checkout face-emo
+          git merge ${{ inputs.tag }}
+
+      - name: Setup .NET
+        uses: Cysharp/Actions/.github/actions/setup-dotnet@main
+
+      - name: Build the project
+        run: |
+          dotnet build src/R3/R3.csproj -c Release -f netstandard2.1 -p:Version=${{ inputs.tag }}
+          dotnet test src/R3/R3.csproj -c Release --no-build
+          ls src/R3/bin/Release/netstandard2.1
+          cp -r src/R3/bin/Release/netstandard2.1/Suzuryg.FaceEmo.Ext.R3* src/R3/Build/
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
