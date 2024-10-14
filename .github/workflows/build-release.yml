@@ -4,58 +4,48 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "tag: git tag you want create. (sample 1.0.0)"
+        description: "Version number to checkout and merge (e.g., 1.0.0)"
         required: true
-      dry-run:
-        description: "dry-run: true will never create relase/nuget."
-        required: true
-        default: false
-        type: boolean
 
 jobs:
-  update-packagejson:
-    uses: Cysharp/Actions/.github/workflows/update-packagejson.yaml@main
-    with:
-      file-path: |
-        ./src/R3.Unity/Assets/R3.Unity/package.json
-        ./src/R3.Godot/addons/R3.Godot/plugin.cfg
-      dotnet-run-path:
-        ./sandbox/ReferenceBuilder/ReferenceBuilder.csproj
-      tag: ${{ inputs.tag }}
-      dry-run: ${{ inputs.dry-run }}
-
-  build-dotnet:
-    needs: [update-packagejson]
+  update-r3-for-face-emo:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: Cysharp/Actions/.github/actions/setup-dotnet@main
-      - run: dotnet build -c Release -p:Version=${{ inputs.tag }}
-      - run: dotnet test -c Release --no-build
-      - run: dotnet pack -c Release --no-build -p:Version=${{ inputs.tag }} -o ./publish
-      # Store artifacts.
-      - uses: Cysharp/Actions/.github/actions/upload-artifact@main
+      - name: Set up Git user
+        run: |
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Checkout the repository
+        uses: actions/checkout@v4
         with:
-          name: nuget
-          path: ./publish/
-          retention-days: 1
+            fetch-depth: 0
 
-  # release
-  create-release:
-    needs: [update-packagejson, build-dotnet]
-    uses: Cysharp/Actions/.github/workflows/create-release.yaml@main
-    with:
-      commit-id: ${{ needs.update-packagejson.outputs.sha }}
-      dry-run: ${{ inputs.dry-run }}
-      tag: ${{ inputs.tag }}
-      nuget-push: true
-      release-upload: false
-    secrets: inherit
+      - name: Fetch and merge R3 version
+        run: |
+          git remote add upstream https://github.com/Cysharp/R3.git
+          git fetch upstream --tags
+          git checkout -b ${{ inputs.tag }} $(git rev-list -n 1 tags/${{ inputs.tag }})
+          git checkout face-emo
+          git merge ${{ inputs.tag }}
 
-  cleanup:
-    if: ${{ needs.update-packagejson.outputs.is-branch-created == 'true' }}
-    needs: [update-packagejson, build-dotnet]
-    uses: Cysharp/Actions/.github/workflows/clean-packagejson-branch.yaml@main
-    with:
-      branch: ${{ needs.update-packagejson.outputs.branch-name }}
+      - name: Setup .NET
+        uses: Cysharp/Actions/.github/actions/setup-dotnet@main
+
+      - name: Build the project
+        run: |
+          dotnet build src/R3/R3.csproj -c Release -f netstandard2.1 -p:Version=${{ inputs.tag }}
+          dotnet test src/R3/R3.csproj -c Release --no-build
+          ls src/R3/bin/Release/netstandard2.1
+          rm -rf src/R3/Build/netstandard2.1
+          mkdir src/R3/Build/netstandard2.1
+          cp -r src/R3/bin/Release/netstandard2.1/Suzuryg.FaceEmo.Ext.R3* src/R3/Build/netstandard2.1/
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+            commit-message: Update build for FaceEmo to ${{ inputs.tag }}
+            title: Update face-emo branch to ${{ inputs.tag }}
+            body: |
+                - Merge tag ${{ inputs.tag }} into face-emo branch
+                - Update build for FaceEmo to ${{ inputs.tag }}
