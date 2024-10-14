@@ -1,6 +1,6 @@
 ﻿namespace R3;
 
-public static partial class ObservableExtensions
+public static partial class Observable
 {
     public static Observable<TResult> Zip<T1, T2, TResult>(
         this
@@ -233,8 +233,6 @@ internal sealed class Zip<T1, T2, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 2;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -243,7 +241,6 @@ internal sealed class Zip<T1, T2, TResult>(
         readonly ZipObserver<T2> observer2;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -276,14 +273,20 @@ internal sealed class Zip<T1, T2, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -292,7 +295,7 @@ internal sealed class Zip<T1, T2, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -308,8 +311,15 @@ internal sealed class Zip<T1, T2, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -327,7 +337,11 @@ internal sealed class Zip<T1, T2, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -346,8 +360,6 @@ internal sealed class Zip<T1, T2, T3, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 3;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -358,7 +370,6 @@ internal sealed class Zip<T1, T2, T3, TResult>(
         readonly ZipObserver<T3> observer3;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -395,14 +406,20 @@ internal sealed class Zip<T1, T2, T3, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -411,7 +428,7 @@ internal sealed class Zip<T1, T2, T3, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -428,8 +445,15 @@ internal sealed class Zip<T1, T2, T3, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -447,7 +471,11 @@ internal sealed class Zip<T1, T2, T3, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -467,8 +495,6 @@ internal sealed class Zip<T1, T2, T3, T4, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 4;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -481,7 +507,6 @@ internal sealed class Zip<T1, T2, T3, T4, TResult>(
         readonly ZipObserver<T4> observer4;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -522,14 +547,20 @@ internal sealed class Zip<T1, T2, T3, T4, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -538,7 +569,7 @@ internal sealed class Zip<T1, T2, T3, T4, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -556,8 +587,15 @@ internal sealed class Zip<T1, T2, T3, T4, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -575,7 +613,11 @@ internal sealed class Zip<T1, T2, T3, T4, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -596,8 +638,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 5;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -612,7 +652,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, TResult>(
         readonly ZipObserver<T5> observer5;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -657,14 +696,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -673,7 +718,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -692,8 +737,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -711,7 +763,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -733,8 +789,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 6;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -751,7 +805,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, TResult>(
         readonly ZipObserver<T6> observer6;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -800,14 +853,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -816,7 +875,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -836,8 +895,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -855,7 +921,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -878,8 +948,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 7;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -898,7 +966,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, TResult>(
         readonly ZipObserver<T7> observer7;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -951,14 +1018,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -967,7 +1040,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -988,8 +1061,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -1007,7 +1087,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -1031,8 +1115,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 8;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -1053,7 +1135,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, TResult>(
         readonly ZipObserver<T8> observer8;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -1110,14 +1191,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue && observer8.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7) && observer8.HasValue(out var shouldComplete8))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue(), observer8.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7 || shouldComplete8)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -1126,7 +1213,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted && observer8.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -1148,8 +1235,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -1167,7 +1261,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -1192,8 +1290,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 9;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -1216,7 +1312,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, TResult>(
         readonly ZipObserver<T9> observer9;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -1277,14 +1372,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue && observer8.HasValue && observer9.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7) && observer8.HasValue(out var shouldComplete8) && observer9.HasValue(out var shouldComplete9))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue(), observer8.Values.Dequeue(), observer9.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7 || shouldComplete8 || shouldComplete9)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -1293,7 +1394,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted && observer8.IsCompleted && observer9.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -1316,8 +1417,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -1335,7 +1443,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -1361,8 +1473,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TResult>(
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 10;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -1387,7 +1497,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TResult>(
         readonly ZipObserver<T10> observer10;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -1452,14 +1561,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TResult>(
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue && observer8.HasValue && observer9.HasValue && observer10.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7) && observer8.HasValue(out var shouldComplete8) && observer9.HasValue(out var shouldComplete9) && observer10.HasValue(out var shouldComplete10))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue(), observer8.Values.Dequeue(), observer9.Values.Dequeue(), observer10.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7 || shouldComplete8 || shouldComplete9 || shouldComplete10)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -1468,7 +1583,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TResult>(
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted && observer8.IsCompleted && observer9.IsCompleted && observer10.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -1492,8 +1607,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TResult>(
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -1511,7 +1633,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TResult>(
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -1538,8 +1664,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TResult>
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 11;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -1566,7 +1690,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TResult>
         readonly ZipObserver<T11> observer11;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -1635,14 +1758,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TResult>
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue && observer8.HasValue && observer9.HasValue && observer10.HasValue && observer11.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7) && observer8.HasValue(out var shouldComplete8) && observer9.HasValue(out var shouldComplete9) && observer10.HasValue(out var shouldComplete10) && observer11.HasValue(out var shouldComplete11))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue(), observer8.Values.Dequeue(), observer9.Values.Dequeue(), observer10.Values.Dequeue(), observer11.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7 || shouldComplete8 || shouldComplete9 || shouldComplete10 || shouldComplete11)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -1651,7 +1780,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TResult>
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted && observer8.IsCompleted && observer9.IsCompleted && observer10.IsCompleted && observer11.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -1676,8 +1805,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TResult>
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -1695,7 +1831,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TResult>
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -1723,8 +1863,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TRe
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 12;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -1753,7 +1891,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TRe
         readonly ZipObserver<T12> observer12;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -1826,14 +1963,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TRe
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue && observer8.HasValue && observer9.HasValue && observer10.HasValue && observer11.HasValue && observer12.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7) && observer8.HasValue(out var shouldComplete8) && observer9.HasValue(out var shouldComplete9) && observer10.HasValue(out var shouldComplete10) && observer11.HasValue(out var shouldComplete11) && observer12.HasValue(out var shouldComplete12))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue(), observer8.Values.Dequeue(), observer9.Values.Dequeue(), observer10.Values.Dequeue(), observer11.Values.Dequeue(), observer12.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7 || shouldComplete8 || shouldComplete9 || shouldComplete10 || shouldComplete11 || shouldComplete12)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -1842,7 +1985,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TRe
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted && observer8.IsCompleted && observer9.IsCompleted && observer10.IsCompleted && observer11.IsCompleted && observer12.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -1868,8 +2011,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TRe
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -1887,7 +2037,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TRe
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -1916,8 +2070,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 13;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -1948,7 +2100,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
         readonly ZipObserver<T13> observer13;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -2025,14 +2176,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue && observer8.HasValue && observer9.HasValue && observer10.HasValue && observer11.HasValue && observer12.HasValue && observer13.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7) && observer8.HasValue(out var shouldComplete8) && observer9.HasValue(out var shouldComplete9) && observer10.HasValue(out var shouldComplete10) && observer11.HasValue(out var shouldComplete11) && observer12.HasValue(out var shouldComplete12) && observer13.HasValue(out var shouldComplete13))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue(), observer8.Values.Dequeue(), observer9.Values.Dequeue(), observer10.Values.Dequeue(), observer11.Values.Dequeue(), observer12.Values.Dequeue(), observer13.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7 || shouldComplete8 || shouldComplete9 || shouldComplete10 || shouldComplete11 || shouldComplete12 || shouldComplete13)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -2041,7 +2198,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted && observer8.IsCompleted && observer9.IsCompleted && observer10.IsCompleted && observer11.IsCompleted && observer12.IsCompleted && observer13.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -2068,8 +2225,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -2087,7 +2251,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -2117,8 +2285,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 14;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -2151,7 +2317,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
         readonly ZipObserver<T14> observer14;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -2232,14 +2397,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue && observer8.HasValue && observer9.HasValue && observer10.HasValue && observer11.HasValue && observer12.HasValue && observer13.HasValue && observer14.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7) && observer8.HasValue(out var shouldComplete8) && observer9.HasValue(out var shouldComplete9) && observer10.HasValue(out var shouldComplete10) && observer11.HasValue(out var shouldComplete11) && observer12.HasValue(out var shouldComplete12) && observer13.HasValue(out var shouldComplete13) && observer14.HasValue(out var shouldComplete14))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue(), observer8.Values.Dequeue(), observer9.Values.Dequeue(), observer10.Values.Dequeue(), observer11.Values.Dequeue(), observer12.Values.Dequeue(), observer13.Values.Dequeue(), observer14.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7 || shouldComplete8 || shouldComplete9 || shouldComplete10 || shouldComplete11 || shouldComplete12 || shouldComplete13 || shouldComplete14)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -2248,7 +2419,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted && observer8.IsCompleted && observer9.IsCompleted && observer10.IsCompleted && observer11.IsCompleted && observer12.IsCompleted && observer13.IsCompleted && observer14.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -2276,8 +2447,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -2295,7 +2473,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }
@@ -2326,8 +2508,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
     sealed class _Zip : IDisposable
     {
-        const int SourceCount = 15;
-
         readonly Observer<TResult> observer;
         readonly Observable<T1> source1;
         readonly Observable<T2> source2;
@@ -2362,7 +2542,6 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
         readonly ZipObserver<T15> observer15;
         
         readonly object gate = new object();
-        int completedCount;
 
         public _Zip(
             Observer<TResult> observer,
@@ -2447,14 +2626,20 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
         public void TryPublishOnNext()
         {
-            if (observer1.HasValue && observer2.HasValue && observer3.HasValue && observer4.HasValue && observer5.HasValue && observer6.HasValue && observer7.HasValue && observer8.HasValue && observer9.HasValue && observer10.HasValue && observer11.HasValue && observer12.HasValue && observer13.HasValue && observer14.HasValue && observer15.HasValue)
+            if (observer1.HasValue(out var shouldComplete1) && observer2.HasValue(out var shouldComplete2) && observer3.HasValue(out var shouldComplete3) && observer4.HasValue(out var shouldComplete4) && observer5.HasValue(out var shouldComplete5) && observer6.HasValue(out var shouldComplete6) && observer7.HasValue(out var shouldComplete7) && observer8.HasValue(out var shouldComplete8) && observer9.HasValue(out var shouldComplete9) && observer10.HasValue(out var shouldComplete10) && observer11.HasValue(out var shouldComplete11) && observer12.HasValue(out var shouldComplete12) && observer13.HasValue(out var shouldComplete13) && observer14.HasValue(out var shouldComplete14) && observer15.HasValue(out var shouldComplete15))
             {
                 var result = resultSelector(observer1.Values.Dequeue(), observer2.Values.Dequeue(), observer3.Values.Dequeue(), observer4.Values.Dequeue(), observer5.Values.Dequeue(), observer6.Values.Dequeue(), observer7.Values.Dequeue(), observer8.Values.Dequeue(), observer9.Values.Dequeue(), observer10.Values.Dequeue(), observer11.Values.Dequeue(), observer12.Values.Dequeue(), observer13.Values.Dequeue(), observer14.Values.Dequeue(), observer15.Values.Dequeue());
                 observer.OnNext(result);
+
+                if (shouldComplete1 || shouldComplete2 || shouldComplete3 || shouldComplete4 || shouldComplete5 || shouldComplete6 || shouldComplete7 || shouldComplete8 || shouldComplete9 || shouldComplete10 || shouldComplete11 || shouldComplete12 || shouldComplete13 || shouldComplete14 || shouldComplete15)
+                {
+                    observer.OnCompleted();
+                    Dispose();
+                }
             }
         }
 
-        public void TryPublishOnCompleted(Result result)
+        public void TryPublishOnCompleted(Result result, bool empty)
         {
             if (result.IsFailure)
             {
@@ -2463,7 +2648,7 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
             }
             else
             {
-                if (Interlocked.Increment(ref completedCount) == SourceCount)
+                if (empty || (observer1.IsCompleted && observer2.IsCompleted && observer3.IsCompleted && observer4.IsCompleted && observer5.IsCompleted && observer6.IsCompleted && observer7.IsCompleted && observer8.IsCompleted && observer9.IsCompleted && observer10.IsCompleted && observer11.IsCompleted && observer12.IsCompleted && observer13.IsCompleted && observer14.IsCompleted && observer15.IsCompleted))
                 {
                     observer.OnCompleted();
                     Dispose();
@@ -2492,8 +2677,15 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
         sealed class ZipObserver<T>(_Zip parent) : Observer<T>
         {
-            public Queue<T> Values { get; private set; } = new Queue<T>();
-            public bool HasValue => Values.Count != 0;
+            public Queue<T> Values { get; } = new Queue<T>();
+            public bool IsCompleted { get; private set; }
+
+            public bool HasValue(out bool shouldComplete)
+            {
+                var count = Values.Count;
+                shouldComplete = IsCompleted && count == 1;
+                return count != 0;
+            }
 
             protected override void OnNextCore(T value)
             {
@@ -2511,7 +2703,11 @@ internal sealed class Zip<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 
             protected override void OnCompletedCore(Result result)
             {
-                parent.TryPublishOnCompleted(result);
+                lock (parent.gate)
+                {
+                    IsCompleted = true;
+                    parent.TryPublishOnCompleted(result, Values.Count == 0);
+                }
             }
         }
     }

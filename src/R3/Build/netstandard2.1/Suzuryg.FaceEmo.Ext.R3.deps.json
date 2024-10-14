@@ -7,7 +7,7 @@
   "targets": {
     ".NETStandard,Version=v2.1": {},
     ".NETStandard,Version=v2.1/": {
-      "Suzuryg.FaceEmo.Ext.R3/1.1.16": {
+      "Suzuryg.FaceEmo.Ext.R3/1.2.9": {
         "dependencies": {
           "PolySharp": "1.14.1",
           "Suzuryg.FaceEmo.Ext.Annotations": "5.0.0.0",
@@ -55,7 +55,7 @@
     }
   },
   "libraries": {
-    "Suzuryg.FaceEmo.Ext.R3/1.1.16": {
+    "Suzuryg.FaceEmo.Ext.R3/1.2.9": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

@@ -1,4 +1,6 @@
-﻿namespace R3;
+﻿using System.Runtime.CompilerServices;
+
+namespace R3;
 
 // thread-safety state for Subject.
 internal struct CompleteState
@@ -67,12 +69,13 @@ internal struct CompleteState
         return false;
     }
 
+    // throws exception when state is disposed
     public bool IsCompleted
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            var currentState = Volatile.Read(ref completeState);
-            switch (currentState)
+            switch (completeState)
             {
                 case NotCompleted:
                     return false;
@@ -90,6 +93,15 @@ internal struct CompleteState
     }
 
     public bool IsDisposed => Volatile.Read(ref completeState) == Disposed;
+
+    public bool IsCompletedOrDisposed
+    {
+        get
+        {
+            var state = Volatile.Read(ref completeState);
+            return state == Disposed || state == CompletedSuccess || state == CompletedFailure;
+        }
+    }
 
     public Result? TryGetResult()
     {
@@ -133,25 +145,28 @@ internal struct CompleteState
     }
 }
 
-public sealed class Subject<T> : Observable<T>, ISubject<T>, IDisposable
+public class Subject<T> : Observable<T>, ISubject<T>, IDisposable
 {
-    FreeListCore<Subscription> list; // struct(array, int)
-    CompleteState completeState;     // struct(int, IntPtr)
+    // similar implementation to ReactiveProperty
 
-    public Subject()
-    {
-        list = new FreeListCore<Subscription>(this); // use self as gate(reduce memory usage), this is slightly dangerous so don't lock this in user.
-    }
+    CompleteState completeState;
+    ObserverNode? root;
+    ulong version = 1;
 
     public bool IsDisposed => completeState.IsDisposed;
+    internal bool IsCompletedOrDisposed => completeState.IsCompletedOrDisposed;
 
     public void OnNext(T value)
     {
         if (completeState.IsCompleted) return;
 
-        foreach (var subscription in list.AsSpan())
+        var currentVersion = GetVersion();
+        var node = root;
+        while (node != null)
         {
-            subscription?.observer.OnNext(value);
+            if (node.Version > currentVersion) break;
+            node.Observer.OnNext(value);
+            node = node.Next;
         }
     }
 
@@ -159,9 +174,13 @@ public sealed class Subject<T> : Observable<T>, ISubject<T>, IDisposable
     {
         if (completeState.IsCompleted) return;
 
-        foreach (var subscription in list.AsSpan())
+        var currentVersion = GetVersion();
+        var node = root;
+        while (node != null)
         {
-            subscription?.observer.OnErrorResume(error);
+            if (node.Version > currentVersion) break;
+            node.Observer.OnErrorResume(error);
+            node = node.Next;
         }
     }
 
@@ -173,9 +192,13 @@ public sealed class Subject<T> : Observable<T>, ISubject<T>, IDisposable
             return; // already completed
         }
 
-        foreach (var subscription in list.AsSpan())
+        var currentVersion = GetVersion();
+        var node = root;
+        while (node != null)
         {
-            subscription?.observer.OnCompleted(result);
+            if (node.Version > currentVersion) break;
+            node.Observer.OnCompleted(result);
+            node = node.Next;
         }
     }
 
@@ -188,18 +211,23 @@ public sealed class Subject<T> : Observable<T>, ISubject<T>, IDisposable
             return Disposable.Empty;
         }
 
-        var subscription = new Subscription(this, observer); // create subscription and add observer to list.
+        var subscription = new ObserverNode(this, observer, version);
 
         // need to check called completed during adding
         result = completeState.TryGetResult();
         if (result != null)
         {
-            subscription.observer.OnCompleted(result.Value);
+            subscription.Observer.OnCompleted(result.Value);
             subscription.Dispose();
             return Disposable.Empty;
         }
 
         return subscription;
+    }
+
+    void ThrowIfDisposed()
+    {
+        if (IsDisposed) throw new ObjectDisposedException("");
     }
 
     public void Dispose()
@@ -211,30 +239,89 @@ public sealed class Subject<T> : Observable<T>, ISubject<T>, IDisposable
     {
         if (completeState.TrySetDisposed(out var alreadyCompleted))
         {
-            if (callOnCompleted && !alreadyCompleted)
+            if (!alreadyCompleted && callOnCompleted)
             {
-                // not yet disposed so can call list iteration
-                foreach (var subscription in list.AsSpan())
+                var currentVersion = GetVersion();
+                var node = root;
+                Volatile.Write(ref root, null);
+                while (node != null)
                 {
-                    subscription?.observer.OnCompleted();
+                    if (node.Version > currentVersion) break;
+                    node.Observer.OnCompleted();
+                    node = node.Next;
                 }
             }
-
-            list.Dispose();
+            else
+            {
+                Volatile.Write(ref root, null);
+            }
         }
     }
 
-    sealed class Subscription : IDisposable
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    ulong GetVersion()
     {
-        public readonly Observer<T> observer;
-        readonly int removeKey;
+        ulong currentVersion;
+        if (version == ulong.MaxValue)
+        {
+            ResetAllObserverVersion();
+            currentVersion = 0;
+        }
+        else
+        {
+            currentVersion = version++;
+        }
+        return currentVersion;
+
+        void ResetAllObserverVersion()
+        {
+            lock (this)
+            {
+                var node = root;
+                while (node != null)
+                {
+                    node.Version = 0;
+                    node = node.Next;
+                }
+
+                version = 1; // also reset version
+            }
+        }
+    }
+
+    sealed class ObserverNode : IDisposable
+    {
+        public readonly Observer<T> Observer;
+
         Subject<T>? parent;
 
-        public Subscription(Subject<T> parent, Observer<T> observer)
+        public ObserverNode? Previous { get; set; } // Previous is last node or root(null).
+        public ObserverNode? Next { get; set; }
+        public ulong Version; // internal use, allow reset
+
+        public ObserverNode(Subject<T> parent, Observer<T> observer, ulong version)
         {
             this.parent = parent;
-            this.observer = observer;
-            parent.list.Add(this, out removeKey); // for the thread-safety, add and set removeKey in same lock.
+            this.Observer = observer;
+            this.Version = version;
+
+            lock (parent)
+            {
+                if (parent.root == null)
+                {
+                    // Single list(both previous and next is null)
+                    Volatile.Write(ref parent.root, this);
+                }
+                else
+                {
+                    // previous is last, null then root is last.
+                    var lastNode = parent.root.Previous ?? parent.root;
+
+                    lastNode.Next = this;
+                    this.Previous = lastNode;
+                    parent.root.Previous = this;
+                }
+            }
         }
 
         public void Dispose()
@@ -242,8 +329,52 @@ public sealed class Subject<T> : Observable<T>, ISubject<T>, IDisposable
             var p = Interlocked.Exchange(ref parent, null);
             if (p == null) return;
 
-            // removeKey is index, will reuse if remove completed so only allows to call from here and must not call twice.
-            p.list.Remove(removeKey);
+            // keep this.Next for dispose on iterating
+            // Remove node(self) from list
+            lock (p)
+            {
+                if (p.IsCompletedOrDisposed) return;
+
+                if (this == p.root)
+                {
+                    if (this.Previous == null || this.Next == null)
+                    {
+                        // case of single list
+                        p.root = null;
+                    }
+                    else
+                    {
+                        // otherwise, root is next node.
+                        var root = this.Next;
+
+                        // single list.
+                        if (root.Next == null)
+                        {
+                            root.Previous = null;
+                        }
+                        else
+                        {
+                            root.Previous = this.Previous; // as last.
+                        }
+
+                        p.root = root;
+                    }
+                }
+                else
+                {
+                    // node is not root, previous must exists
+                    this.Previous!.Next = this.Next;
+                    if (this.Next != null)
+                    {
+                        this.Next.Previous = this.Previous;
+                    }
+                    else
+                    {
+                        // next does not exists, previous is last node so modify root
+                        p.root!.Previous = this.Previous;
+                    }
+                }
+            }
         }
     }
 }
