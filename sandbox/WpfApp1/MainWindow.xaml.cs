@@ -58,12 +58,12 @@ public partial class MainWindow : Window
 public class BasicUsagesViewModel : IDisposable
 {
     public BindableReactiveProperty<string> Input { get; }
-    public BindableReactiveProperty<string> Output { get; }
+    public IReadOnlyBindableReactiveProperty<string> Output { get; }
 
     public BasicUsagesViewModel()
     {
         Input = new BindableReactiveProperty<string>("");
-        Output = Input.Select(x => x.ToUpper()).ToBindableReactiveProperty("");
+        Output = Input.Select(x => x.ToUpper()).ToReadOnlyBindableReactiveProperty("");
     }
 
     public void Dispose()
@@ -118,7 +118,7 @@ public class ValidationViewModel : IDisposable
 public class CommandViewModel : IDisposable
 {
     public BindableReactiveProperty<bool> OnCheck { get; }
-    public ReactiveCommand<Unit> ShowMessageBox { get; }
+    public ReactiveCommand ShowMessageBox { get; }
 
     public CommandViewModel()
     {
@@ -131,6 +131,6 @@ public class CommandViewModel : IDisposable
 
     public void Dispose()
     {
-        Disposable.Combine(OnCheck, ShowMessageBox);
+        Disposable.Dispose(OnCheck, ShowMessageBox);
     }
 }

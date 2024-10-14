@@ -8,10 +8,36 @@ using System.Runtime.CompilerServices;
 namespace R3;
 
 // for binding(TriggerAction, Behavior) usage
-public interface IBindableReactiveProperty
+
+public interface IReadOnlyBindableReactiveProperty : INotifyPropertyChanged, INotifyDataErrorInfo, IDisposable
 {
-    object? Value { get; set; }
+    object? Value { get; }
+}
+
+public interface IReadOnlyBindableReactiveProperty<T> : IReadOnlyBindableReactiveProperty
+{
+    new T Value { get; }
+    IReadOnlyBindableReactiveProperty<T> EnableValidation();
+    IReadOnlyBindableReactiveProperty<T> EnableValidation(Func<T, Exception?> validator);
+    IReadOnlyBindableReactiveProperty<T> EnableValidation<TClass>([CallerMemberName] string? propertyName = null!);
+    IReadOnlyBindableReactiveProperty<T> EnableValidation(Expression<Func<IReadOnlyBindableReactiveProperty<T>?>> selfSelector);
+    Observable<T> AsObservable();
+}
+
+public interface IBindableReactiveProperty : IReadOnlyBindableReactiveProperty
+{
+    new object? Value { get; set; }
     void OnNext(object? value);
+}
+
+public interface IBindableReactiveProperty<T> : IBindableReactiveProperty, IReadOnlyBindableReactiveProperty<T>
+{
+    new T Value { get; set; }
+    void OnNext(T value);
+    new IBindableReactiveProperty<T> EnableValidation();
+    new IBindableReactiveProperty<T> EnableValidation(Func<T, Exception?> validator);
+    new IBindableReactiveProperty<T> EnableValidation<TClass>([CallerMemberName] string? propertyName = null!);
+    IBindableReactiveProperty<T> EnableValidation(Expression<Func<IBindableReactiveProperty<T>?>> selfSelector);
 }
 
 // all operators need to call from UI Thread(not thread-safe)
@@ -19,7 +45,7 @@ public interface IBindableReactiveProperty
 #if NET6_0_OR_GREATER
 [System.Text.Json.Serialization.JsonConverter(typeof(BindableReactivePropertyJsonConverterFactory))]
 #endif
-public class BindableReactiveProperty<T> : ReactiveProperty<T>, INotifyPropertyChanged, INotifyDataErrorInfo, IBindableReactiveProperty
+public class BindableReactiveProperty<T> : ReactiveProperty<T>, IBindableReactiveProperty<T>
 {
     IDisposable? subscription;
 
@@ -38,6 +64,13 @@ public class BindableReactiveProperty<T> : ReactiveProperty<T>, INotifyPropertyC
     public BindableReactiveProperty(T value, IEqualityComparer<T>? equalityComparer)
         : base(value, equalityComparer)
     {
+    }
+
+    // WinForms reflection data binding require to impl Value in this type
+    public new T Value
+    {
+        get => base.Value;
+        set => base.Value = value;
     }
 
     // ToBindableReactiveProperty
@@ -252,6 +285,50 @@ public class BindableReactiveProperty<T> : ReactiveProperty<T>, INotifyPropertyC
     void IBindableReactiveProperty.OnNext(object? value)
     {
         OnNext((T)value!);
+    }
+
+    IBindableReactiveProperty<T> IBindableReactiveProperty<T>.EnableValidation() => EnableValidation();
+
+    IBindableReactiveProperty<T> IBindableReactiveProperty<T>.EnableValidation(Func<T, Exception?> validator) => EnableValidation(validator);
+
+    IBindableReactiveProperty<T> IBindableReactiveProperty<T>.EnableValidation<TClass>(string? propertyName) => EnableValidation<TClass>(propertyName);
+
+    IBindableReactiveProperty<T> IBindableReactiveProperty<T>.EnableValidation(Expression<Func<IBindableReactiveProperty<T>?>> selfSelector)
+    {
+        var memberExpression = (MemberExpression)selfSelector.Body;
+        var propertyInfo = (PropertyInfo)memberExpression.Member;
+        SetValidationContext(propertyInfo);
+
+        enableNotifyError = true;
+        return this;
+    }
+
+    // IReadOnlyBindableReactiveProperty
+
+    object? IReadOnlyBindableReactiveProperty.Value
+    {
+        get => Value;
+    }
+
+    IReadOnlyBindableReactiveProperty<T> IReadOnlyBindableReactiveProperty<T>.EnableValidation() => EnableValidation();
+
+    IReadOnlyBindableReactiveProperty<T> IReadOnlyBindableReactiveProperty<T>.EnableValidation(Func<T, Exception?> validator) => EnableValidation(validator);
+
+    IReadOnlyBindableReactiveProperty<T> IReadOnlyBindableReactiveProperty<T>.EnableValidation<TClass>(string? propertyName) => EnableValidation<TClass>(propertyName);
+
+    IReadOnlyBindableReactiveProperty<T> IReadOnlyBindableReactiveProperty<T>.EnableValidation(Expression<Func<IReadOnlyBindableReactiveProperty<T>?>> selfSelector)
+    {
+        var memberExpression = (MemberExpression)selfSelector.Body;
+        var propertyInfo = (PropertyInfo)memberExpression.Member;
+        SetValidationContext(propertyInfo);
+
+        enableNotifyError = true;
+        return this;
+    }
+
+    public Observable<T> AsObservable()
+    {
+        return this;
     }
 }
 

@@ -21,14 +21,24 @@ public static partial class ObservableExtensions
         return new TakeUntilC<T>(source, cancellationToken);
     }
 
-    public static Observable<T> TakeUntil<T>(this Observable<T> source, Task task)
+    public static Observable<T> TakeUntil<T>(this Observable<T> source, Task task, bool configureAwait = true)
     {
-        return new TakeUntilT<T>(source, task);
+        return new TakeUntilT<T>(source, task, configureAwait);
     }
 
     public static Observable<T> TakeUntil<T>(this Observable<T> source, Func<T, CancellationToken, ValueTask> asyncFunc, bool configureAwait = true)
     {
         return new TakeUntilAsync<T>(source, asyncFunc, configureAwait);
+    }
+
+    public static Observable<T> TakeUntil<T>(this Observable<T> source, Func<T, bool> predicate)
+    {
+        return new TakeUntil<T>(source, predicate);
+    }
+
+    public static Observable<T> TakeUntil<T>(this Observable<T> source, Func<T, int, bool> predicate)
+    {
+        return new TakeUntilI<T>(source, predicate);
     }
 }
 
@@ -149,20 +159,22 @@ internal sealed class TakeUntilC<T>(Observable<T> source, CancellationToken canc
     }
 }
 
-internal sealed class TakeUntilT<T>(Observable<T> source, Task task) : Observable<T>
+internal sealed class TakeUntilT<T>(Observable<T> source, Task task, bool configureAwait) : Observable<T>
 {
     protected override IDisposable SubscribeCore(Observer<T> observer)
     {
-        return source.Subscribe(new _TakeUntil(observer, task));
+        return source.Subscribe(new _TakeUntil(observer, task, configureAwait));
     }
 
     sealed class _TakeUntil : Observer<T>, IDisposable
     {
         readonly Observer<T> observer;
+        readonly bool configureAwait;
 
-        public _TakeUntil(Observer<T> observer, Task task)
+        public _TakeUntil(Observer<T> observer, Task task, bool configureAwait)
         {
             this.observer = observer;
+            this.configureAwait = configureAwait;
             TaskAwait(task);
         }
 
@@ -185,7 +197,7 @@ internal sealed class TakeUntilT<T>(Observable<T> source, Task task) : Observabl
         {
             try
             {
-                await task.ConfigureAwait(false);
+                await task.ConfigureAwait(configureAwait);
                 OnCompleted(Result.Success);
             }
             catch (Exception ex)
@@ -255,6 +267,70 @@ internal sealed class TakeUntilAsync<T>(Observable<T> source, Func<T, Cancellati
             }
 
             observer.OnCompleted();
+        }
+    }
+}
+
+internal sealed class TakeUntil<T>(Observable<T> source, Func<T, bool> predicate) : Observable<T>
+{
+    protected override IDisposable SubscribeCore(Observer<T> observer)
+    {
+        return source.Subscribe(new _TakeUntil(observer, predicate));
+    }
+
+    sealed class _TakeUntil(Observer<T> observer, Func<T, bool> predicate) : Observer<T>, IDisposable
+    {
+        protected override void OnNextCore(T value)
+        {
+            observer.OnNext(value);
+
+            if (predicate(value))
+            {
+                observer.OnCompleted();
+            }
+        }
+
+        protected override void OnErrorResumeCore(Exception error)
+        {
+            observer.OnErrorResume(error);
+        }
+
+        protected override void OnCompletedCore(Result result)
+        {
+            observer.OnCompleted(result);
+        }
+    }
+}
+
+internal sealed class TakeUntilI<T>(Observable<T> source, Func<T, int, bool> predicate) : Observable<T>
+{
+    protected override IDisposable SubscribeCore(Observer<T> observer)
+    {
+        return source.Subscribe(new _TakeUntil(observer, predicate));
+    }
+
+    sealed class _TakeUntil(Observer<T> observer, Func<T, int, bool> predicate) : Observer<T>, IDisposable
+    {
+        int count;
+
+        protected override void OnNextCore(T value)
+        {
+            observer.OnNext(value);
+
+            if (predicate(value, count++))
+            {
+                observer.OnCompleted();
+            }
+        }
+
+        protected override void OnErrorResumeCore(Exception error)
+        {
+            observer.OnErrorResume(error);
+        }
+
+        protected override void OnCompletedCore(Result result)
+        {
+            observer.OnCompleted(result);
         }
     }
 }
