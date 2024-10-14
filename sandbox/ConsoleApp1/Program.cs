@@ -1,15 +1,10 @@
 ﻿using R3;
 
-// check https://github.com/Cysharp/R3/issues/226
+var r1 = Observable.Return(1);
+var r2 = Observable.Interval(TimeSpan.FromSeconds(1)).Index();
 
-//Observable.ReturnUnit()
-//  .SelectMany(selector: _ => Observable
-//    .Defer(observableFactory: () => Observable.ReturnUnit().SubscribeOnThreadPool())
-//    // .SubscribeOnThreadPool()
-//  ) // Observable<Unit>
-//  .Subscribe();
+r1.Concat(r2).Subscribe(Console.WriteLine);
+
+await Task.Delay(TimeSpan.FromDays(1)); // wait
 
 
-Observable.Defer(observableFactory: () => Observable.ReturnUnit().Delay(TimeSpan.FromSeconds(1))).Subscribe();
-
-Console.ReadLine();
