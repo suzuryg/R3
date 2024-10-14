@@ -145,11 +145,11 @@ Observable.EveryValueChanged(this, x => x.Height).Subscribe(x => HeightText.Text
 
 Subjects(ReactiveProperty)
 ---
-In R3, there are four types of Subjects: `Subject`, `ReactiveProperty`, `ReplaySubject`, and `ReplayFrameSubject`.
+In R3, there are firve types of Subjects: `Subject`, `BehaviorSubject`, `ReactiveProperty`, `ReplaySubject`, and `ReplayFrameSubject`.
 
-`Subject` is an event in Rx. Just as an event can register multiple Actions and distribute values using Invoke, a `Subject` can register multiple `Observer`s and distribute values using OnNext, OnErrorResume, and OnCompleted. There are variations of Subject, such as `ReactiveProperty`, which holds a single value internally, `ReplaySubject`, which holds multiple values based on count or time, and `ReplayFrameSubject`, which holds multiple values based on frame time. The internally recorded values are distributed when Subscribe is called.
+`Subject` is an event in Rx. Just as an event can register multiple Actions and distribute values using Invoke, a `Subject` can register multiple `Observer`s and distribute values using OnNext, OnErrorResume, and OnCompleted. There are variations of Subject, such as `BehaviorSubject` and `ReactiveProperty`, which holds a single value internally, `ReplaySubject`, which holds multiple values based on count or time, and `ReplayFrameSubject`, which holds multiple values based on frame time. The internally recorded values are distributed when Subscribe is called.
 
- `ReactiveProperty` corresponds to what would be a `BehaviorSubject`, but with the added functionality of eliminating duplicate values. Since you can choose to enable or disable duplicate elimination, it effectively becomes a superior alternative to `BehaviorSubject`, leading to the removal of `BehaviorSubject`.
+ `ReactiveProperty` corresponds to what would be a `BehaviorSubject`, but with the added functionality of eliminating duplicate values. In addition, since the value can be set with `.Value`, it can be utilized for binding on XAML platforms, etc.
 
 Here's an example of creating an observable model using `ReactiveProperty`:
 
@@ -188,7 +188,7 @@ In `ReactiveProperty`, the value is updated by `.Value` and if it is identical t
 
 `ReactiveProperty` has equivalents in other frameworks as well, such as [Android LiveData](https://developer.android.com/topic/libraries/architecture/livedata) and [Kotlin StateFlow](https://developer.android.com/kotlin/flow/stateflow-and-sharedflow), particularly effective for data binding in UI contexts. In .NET, there is a library called [runceel/ReactiveProperty](https://github.com/runceel/ReactiveProperty), which I originally created.
 
-Unlike dotnet/reactive's Subject, all Subjects in R3 (Subject, ReactiveProperty, ReplaySubject, ReplayFrameSubject) are designed to call OnCompleted upon disposal. This is because R3 is designed with a focus on subscription management and unsubscription. By calling OnCompleted, it ensures that all subscriptions are unsubscribed from the Subject, the upstream source of events, by default. If you wish to avoid calling OnCompleted, you can do so by calling `Dispose(false)`.
+Unlike dotnet/reactive's Subject, all Subjects in R3 (Subject, BehaviorSubject, ReactiveProperty, ReplaySubject, ReplayFrameSubject) are designed to call OnCompleted upon disposal. This is because R3 is designed with a focus on subscription management and unsubscription. By calling OnCompleted, it ensures that all subscriptions are unsubscribed from the Subject, the upstream source of events, by default. If you wish to avoid calling OnCompleted, you can do so by calling `Dispose(false)`.
 
 `ReactiveProperty` is mutable, but it can be converted to a read-only `ReadOnlyReactiveProperty`. Following the [guidance for the Android UI Layer](https://developer.android.com/topic/architecture/ui-layer), the Kotlin code below is
 
@@ -269,6 +269,8 @@ public sealed class ClampedReactiveProperty2<T>
 ```
 
 Additionally, `ReactiveProperty` supports serialization with `System.Text.JsonSerializer` in .NET 6 and above. For earlier versions, you need to implement `ReactivePropertyJsonConverterFactory` under the existing implementation and add it to the Converter.
+
+As an internal implementation, `ReactiveProperty` has a lightweight implementation that consumes less memory compared to other Subjects. However, in exchange, its behavior differs slightly, especially in multi-threaded environments. For precautions related to multi-threading, please refer to the [Concurrency Policy](#concurrency-policy) section.
 
 Disposable
 ---
@@ -546,6 +548,49 @@ list.AssertEqual([0, 1, 2, 3]);
 list.AssertIsCompleted();
 ```
 
+`AssertEqual` is a test helper. You can create your own helper to use with the test library.
+
+```csharp
+public static class LiveListExtensions
+{
+    // Should() is xUnit + FluentAssertions
+    public static void AssertEqual<T>(this LiveList<T> list, params T[] expected)
+    {
+        list.Should().Equal(expected);
+    }
+
+    public static void AssertEqual<T>(this LiveList<T[]> list, params T[][] expected)
+    {
+        list.Count.Should().Be(expected.Length);
+
+        for (int i = 0; i < expected.Length; i++)
+        {
+            list[i].Should().Equal(expected[i]);
+        }
+    }
+
+    public static void AssertEmpty<T>(this LiveList<T> list)
+    {
+        list.Count.Should().Be(0);
+    }
+
+    public static void AssertIsCompleted<T>(this LiveList<T> list)
+    {
+        list.IsCompleted.Should().BeTrue();
+    }
+
+    public static void AssertIsNotCompleted<T>(this LiveList<T> list)
+    {
+        list.IsCompleted.Should().BeFalse();
+    }
+
+    public static void Advance(this FakeTimeProvider timeProvider, int seconds)
+    {
+        timeProvider.Advance(TimeSpan.FromSeconds(seconds));
+    }
+}
+```
+
 Interoperability with `IObservable<T>`
 ---
 `Observable<T>` is not `IObservable<T>`. You can convert both by these methods.
@@ -684,9 +729,22 @@ subject.Take(100).Count().Subscribe(x => Console.WriteLine(x));
 Parallel.For(0, 1000, new ParallelOptions { MaxDegreeOfParallelism = 10 }, x => subject.OnNext(x));
 ```
 
-This means that the issuance of OnNext must always be done on a single thread. Also, ReactiveProperty, which corresponds to BehaviorSubject in dotnet/reactive, is not thread-safe itself, so updating the value (set Value or call OnNext) must always be done on a single thread.
+This means that the issuance of OnNext must always be done on a single thread. For converting external inputs into Observables, such as with `FromEvent`, and when the source of input issues in a multi-threaded manner, it is necessary to synchronize using `Synchronize` to construct the correct operator chain.
 
-For converting external inputs into Observables, such as with FromEvent, and when the source of input issues in a multi-threaded manner, it is necessary to synchronize using `Synchronize` to construct the correct operator chain.
+```csharp
+subject.Synchronoize(gate).Take(100).Count().Subscribe();
+```
+
+In R3, ReplaySubject and BehaviorSubject do not require Synchronize and are thread-safe, including OnNext.
+
+ReactiveProperty is not thread-safe and OnNext, set Value and Susbcribe cannot be called simultaneously. If you need to use it in such a situation, use `SynchronizedReactiveProperty` instead.
+
+```csharp
+class MyClass
+{
+    public SynchronizedReactiveProperty<int> Prop { get; } = new();
+}
+```
 
 Sampling Timing
 ---
@@ -2026,6 +2084,7 @@ Operator methods are defined as extension methods to `Observable<T>` in the stat
 | **SubscribeOn**(this `Observable<T>` source, `TimeProvider` timeProvider) | `Observable<T>` | 
 | **SubscribeOn**(this `Observable<T>` source, `FrameProvider` frameProvider) | `Observable<T>` | 
 | **SubscribeOnCurrentSynchronizationContext**(this `Observable<T>` source) | `Observable<T>` | 
+| **SubscribeOnSynchronize**(this `Observable<T>` source, `Object` gate, `Boolean` rawObserver = false) | `Observable<T>` | 
 | **SubscribeOnThreadPool**(this `Observable<T>` source) | `Observable<T>` | 
 | **SumAsync**(this `Observable<Int32>` source, `CancellationToken` cancellationToken = default) | `Task<Int32>` | 
 | **SumAsync**(this `Observable<TSource>` source, `Func<TSource, Int32>` selector, `CancellationToken` cancellationToken = default) | `Task<Int32>` | 
@@ -2154,7 +2213,6 @@ Class/Method name changes from dotnet/reactive and neuecc/UniRx
 * `DistinctUntilChanged(selector)` -> `DistinctUntilChangedBy`
 * `Finally` -> `Do(onDisposed:)`
 * `Do***` -> `Do(on***:)`
-* `BehaviorSubject` -> `ReactiveProperty`
 * `AsyncSubject<T>` -> `TaskCompletionSource<T>`
 * `StableCompositeDisposable` -> `Disposable.Combine`
 * `IScheduler` -> `TimeProvider`
