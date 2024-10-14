@@ -1,0 +1,119 @@
+{
+  "runtimeTarget": {
+    "name": ".NETStandard,Version=v2.1/",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETStandard,Version=v2.1": {},
+    ".NETStandard,Version=v2.1/": {
+      "Suzuryg.FaceEmo.Ext.TimeProvider/8.0.1": {
+        "dependencies": {
+          "Microsoft.CodeAnalysis.CSharp.CodeStyle": "4.5.0",
+          "Microsoft.CodeAnalysis.NetAnalyzers": "8.0.0-preview.23614.1",
+          "Microsoft.DotNet.ApiCompat.Task": "8.0.100",
+          "Microsoft.DotNet.Build.Tasks.TargetFramework": "8.0.0-beta.24266.3",
+          "Microsoft.DotNet.CodeAnalysis": "8.0.0-beta.24266.3",
+          "Microsoft.DotNet.GenAPI": "8.0.0-beta.24266.3",
+          "Microsoft.NET.ILLink.Tasks": "8.0.0-rc.1.23406.6",
+          "Microsoft.Net.Compilers.Toolset": "4.8.0-7.23566.2",
+          "StyleCop.Analyzers": "1.2.0-beta.406"
+        },
+        "runtime": {
+          "Suzuryg.FaceEmo.Ext.TimeProvider.dll": {}
+        }
+      },
+      "Microsoft.CodeAnalysis.CSharp.CodeStyle/4.5.0": {},
+      "Microsoft.CodeAnalysis.NetAnalyzers/8.0.0-preview.23614.1": {},
+      "Microsoft.DotNet.ApiCompat.Task/8.0.100": {},
+      "Microsoft.DotNet.Build.Tasks.TargetFramework/8.0.0-beta.24266.3": {},
+      "Microsoft.DotNet.CodeAnalysis/8.0.0-beta.24266.3": {},
+      "Microsoft.DotNet.GenAPI/8.0.0-beta.24266.3": {},
+      "Microsoft.Net.Compilers.Toolset/4.8.0-7.23566.2": {},
+      "Microsoft.NET.ILLink.Tasks/8.0.0-rc.1.23406.6": {},
+      "StyleCop.Analyzers/1.2.0-beta.406": {
+        "dependencies": {
+          "StyleCop.Analyzers.Unstable": "1.2.0.406"
+        }
+      },
+      "StyleCop.Analyzers.Unstable/1.2.0.406": {}
+    }
+  },
+  "libraries": {
+    "Suzuryg.FaceEmo.Ext.TimeProvider/8.0.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.CodeAnalysis.CSharp.CodeStyle/4.5.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-cJtiKSEuTIKdazIZDepu85+vO7TLtcFqR2HCYUyz8MkqBLfbZ4CqWDrqgLKeh4UlbQJoermhK8ZOML9Am+TSMw==",
+      "path": "microsoft.codeanalysis.csharp.codestyle/4.5.0",
+      "hashPath": "microsoft.codeanalysis.csharp.codestyle.4.5.0.nupkg.sha512"
+    },
+    "Microsoft.CodeAnalysis.NetAnalyzers/8.0.0-preview.23614.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-2dmbYPDsW+B7bey/TefoHMR41RSQ+kWCkWrrvyJH7mE6IOG4Y2mewWzh+acH+s3ZUMOo5xt0DboBADBgTiBGXg==",
+      "path": "microsoft.codeanalysis.netanalyzers/8.0.0-preview.23614.1",
+      "hashPath": "microsoft.codeanalysis.netanalyzers.8.0.0-preview.23614.1.nupkg.sha512"
+    },
+    "Microsoft.DotNet.ApiCompat.Task/8.0.100": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-/2mCsqC7eXByWEbOD3wdcrrz88M+HKIRjTPfw416pkxGTZXpAKwySch0XBN0/MbNqgTix1cXZJZ14GX2puV9Vw==",
+      "path": "microsoft.dotnet.apicompat.task/8.0.100",
+      "hashPath": "microsoft.dotnet.apicompat.task.8.0.100.nupkg.sha512"
+    },
+    "Microsoft.DotNet.Build.Tasks.TargetFramework/8.0.0-beta.24266.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-XcTFswnTqPzfzj0XoEwv/wkrHjE2J4M+iGyJoCOMHhrwXqn73wb3855P2av5e9xj4E50+b9rkkSfTKs0mnMnBA==",
+      "path": "microsoft.dotnet.build.tasks.targetframework/8.0.0-beta.24266.3",
+      "hashPath": "microsoft.dotnet.build.tasks.targetframework.8.0.0-beta.24266.3.nupkg.sha512"
+    },
+    "Microsoft.DotNet.CodeAnalysis/8.0.0-beta.24266.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-JXIDZGt+3LZLQcHso/vxORI6tvBX8QMAgvFmx0O4i/lvIxwTTsQic/PSnV/WgcGPNRCfc4cUAuvwImGBW8ZFLA==",
+      "path": "microsoft.dotnet.codeanalysis/8.0.0-beta.24266.3",
+      "hashPath": "microsoft.dotnet.codeanalysis.8.0.0-beta.24266.3.nupkg.sha512"
+    },
+    "Microsoft.DotNet.GenAPI/8.0.0-beta.24266.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-tY47fB9GSnrv7k9FYsZYK8APtTwZh/Qt+6vPly+XMS/f6lB0Qf4Kw+vvqyAFOarkFv1kVDhLTK2JFvVWt+GMiw==",
+      "path": "microsoft.dotnet.genapi/8.0.0-beta.24266.3",
+      "hashPath": "microsoft.dotnet.genapi.8.0.0-beta.24266.3.nupkg.sha512"
+    },
+    "Microsoft.Net.Compilers.Toolset/4.8.0-7.23566.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-m6Pqw3GkV7EpAFM8bbdgnlnNFWZmlhtR/hLbpIAYj3rFRF9qizXcBYspavJD9uAUdMStjFGmObwmYYf9+SpU4g==",
+      "path": "microsoft.net.compilers.toolset/4.8.0-7.23566.2",
+      "hashPath": "microsoft.net.compilers.toolset.4.8.0-7.23566.2.nupkg.sha512"
+    },
+    "Microsoft.NET.ILLink.Tasks/8.0.0-rc.1.23406.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-RxDSeFB9f5ITAmMDEImxMKX7Xn2NIWgnugi2VyJo+ZSCE1nknqpMLVSWe/9PhlEXyoOCGwaHK0bcgdJ73a1m/A==",
+      "path": "microsoft.net.illink.tasks/8.0.0-rc.1.23406.6",
+      "hashPath": "microsoft.net.illink.tasks.8.0.0-rc.1.23406.6.nupkg.sha512"
+    },
+    "StyleCop.Analyzers/1.2.0-beta.406": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-YbsYoczQPZyz+4nmQ7bBiU9uQkk7Q2KUizQWEv01S4/ImCdJFiHvJfm8HAINNS0cvSLOA7xM9Y+KWQ2FOYjgkA==",
+      "path": "stylecop.analyzers/1.2.0-beta.406",
+      "hashPath": "stylecop.analyzers.1.2.0-beta.406.nupkg.sha512"
+    },
+    "StyleCop.Analyzers.Unstable/1.2.0.406": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-FclNdBR81ynIo9l1QNlo+l0I/PaFIYaPQPlMram8XVIMh6G6G43KTa1aCxfwTj13uKlAJS/LhLy6KjOPOeAU4w==",
+      "path": "stylecop.analyzers.unstable/1.2.0.406",
+      "hashPath": "stylecop.analyzers.unstable.1.2.0.406.nupkg.sha512"
+    }
+  }
+}
